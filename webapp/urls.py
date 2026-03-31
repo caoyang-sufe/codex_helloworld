@@ -24,8 +24,11 @@ from gameapp import views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("", views.game, name="home"),
     path("game", views.game, name="game"),
+    path("game/", views.game, name="game-slash"),
     path("handbook", views.handbook, name="handbook"),
+    path("handbook/", views.handbook, name="handbook-slash"),
     path("api/cards", views.api_cards, name="api-cards"),
     path("api/game/new", views.api_game_new, name="api-game-new"),
     path("api/game/action", views.api_game_action, name="api-game-action"),
