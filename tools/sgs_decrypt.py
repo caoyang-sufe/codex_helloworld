@@ -7,6 +7,8 @@ import sys
 import zipfile
 from pathlib import Path
 
+# python sgs_decrypt.py TavernChessConfig.sgs -o TavernChessConfig.json
+
 
 def _looks_like_zip(data: bytes) -> bool:
     return data[:4] == b"PK\x03\x04"

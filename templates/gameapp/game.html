@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>酒馆卡牌交互原型</title>
+  <style>
+    :root {
+      --bg-1: #efe2cb;
+      --bg-2: #c79457;
+      --panel: rgba(255, 248, 238, 0.88);
+      --panel-strong: rgba(255, 252, 247, 0.96);
+      --line: rgba(90, 56, 23, 0.14);
+      --text: #2e1c0f;
+      --muted: #755c44;
+      --accent: #9b5522;
+      --accent-dark: #6e3612;
+      --gold: #e0a84a;
+      --success: #2f6b50;
+      --danger: #8b2d24;
+      --shadow: rgba(42, 24, 8, 0.18);
+      --enemy: #6d2830;
+      --ally: #315f7f;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.72), transparent 24%),
+        radial-gradient(circle at right 18%, rgba(157, 86, 35, 0.18), transparent 24%),
+        linear-gradient(180deg, var(--bg-1), var(--bg-2));
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+      background-size: 32px 32px;
+      opacity: 0.4;
+      mask-image: radial-gradient(circle at center, black 38%, transparent 95%);
+    }
+
+    .app {
+      width: min(1520px, calc(100vw - 24px));
+      margin: 12px auto;
+      padding: 18px;
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      background: linear-gradient(180deg, rgba(255, 251, 245, 0.78), rgba(255, 245, 232, 0.86));
+      box-shadow: 0 26px 70px var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .hero {
+      max-width: 760px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.75);
+      color: var(--accent);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+    }
+
+    h1 {
+      margin: 12px 0 8px;
+      font-size: clamp(30px, 4.4vw, 54px);
+      line-height: 1;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 10px;
+      min-width: min(100%, 420px);
+      padding: 16px;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      align-content: start;
+    }
+
+    .control-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.76);
+      color: var(--muted);
+      font-size: 14px;
+      border: 1px solid rgba(123, 86, 49, 0.1);
+    }
+
+    .pill strong {
+      margin-left: 6px;
+      color: var(--text);
+      font-size: 16px;
+    }
+
+    .money-pill strong {
+      color: var(--gold);
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 11px 16px;
+      font: inherit;
+      cursor: pointer;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      transform: none;
+    }
+
+    .primary-btn {
+      color: #fff;
+      background: linear-gradient(180deg, var(--accent), var(--accent-dark));
+      box-shadow: 0 10px 22px rgba(111, 56, 19, 0.28);
+    }
+
+    .ghost-btn {
+      color: var(--accent-dark);
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(123, 86, 49, 0.14);
+    }
+
+    .status {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.74);
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .phase-battle .status {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .recruit-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 220px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .shop-column {
+      display: grid;
+      gap: 16px;
+    }
+
+    .side-panel {
+      display: grid;
+      gap: 16px;
+    }
+
+    .board {
+      display: grid;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .zone {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: var(--panel);
+      overflow: hidden;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    }
+
+    .zone-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 18px;
+      border-bottom: 1px solid rgba(88, 58, 26, 0.08);
+      background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0));
+      flex-wrap: wrap;
+    }
+
+    .zone-title {
+      display: grid;
+      gap: 4px;
+    }
+
+    .zone-title h2 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .zone-title p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .zone-meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .zone-badge {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.82);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .slots {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+    }
+
+    .shop-slots {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    .board-slots {
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      min-height: 260px;
+    }
+
+    .hand-slots {
+      grid-template-columns: repeat(10, minmax(0, 1fr));
+      min-height: 260px;
+    }
+
+    .battle-slots {
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      min-height: 250px;
+    }
+
+    .slot {
+      position: relative;
+      min-height: 230px;
+      border-radius: 20px;
+      border: 1px dashed rgba(122, 85, 48, 0.2);
+      background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(145, 101, 57, 0.06));
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      overflow: hidden;
+      transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+    }
+
+    .slot.drop-ready {
+      border-color: rgba(47, 106, 79, 0.45);
+      background: linear-gradient(180deg, rgba(218, 246, 231, 0.8), rgba(145, 101, 57, 0.08));
+      transform: translateY(-2px);
+    }
+
+    .slot-label {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 10px;
+      text-align: center;
+      color: rgba(114, 93, 70, 0.88);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .card {
+      width: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      border-radius: 20px;
+      overflow: hidden;
+      background: var(--panel-strong);
+      box-shadow: 0 14px 26px rgba(61, 40, 18, 0.12);
+      border: 1px solid rgba(116, 80, 45, 0.14);
+    }
+
+    .card[draggable="true"] {
+      cursor: grab;
+    }
+
+    .card.dragging {
+      opacity: 0.42;
+    }
+
+    .card.dead {
+      opacity: 0.38;
+      filter: grayscale(0.8);
+    }
+
+    .card.dying {
+      animation: shatter-out 0.55s ease forwards;
+    }
+
+    .card.attacking {
+      box-shadow: 0 0 0 3px rgba(224, 168, 74, 0.68), 0 16px 30px rgba(61, 40, 18, 0.18);
+    }
+
+    .card.damaged {
+      box-shadow: 0 0 0 3px rgba(139, 45, 36, 0.45), 0 16px 30px rgba(61, 40, 18, 0.18);
+    }
+
+    .card.hit {
+      animation: hit-shake 0.26s ease;
+    }
+
+    .card.impact::after {
+      content: "";
+      position: absolute;
+      inset: -10%;
+      border-radius: 22px;
+      background: radial-gradient(circle at center, rgba(255, 214, 112, 0.75), transparent 62%);
+      opacity: 0;
+      animation: impact-flash 0.28s ease;
+      pointer-events: none;
+    }
+
+    @keyframes hit-shake {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(3px, -2px); }
+      50% { transform: translate(-3px, 2px); }
+      75% { transform: translate(2px, 2px); }
+      100% { transform: translate(0, 0); }
+    }
+
+    @keyframes impact-flash {
+      0% { opacity: 0; transform: scale(0.9); }
+      40% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.08); }
+    }
+
+    @keyframes shatter-out {
+      0% { opacity: 1; transform: scale(1) rotate(0deg); filter: grayscale(0); }
+      40% { opacity: 0.8; transform: scale(1.04) rotate(-1deg); }
+      100% { opacity: 0; transform: scale(0.88) rotate(3deg); filter: blur(2px) grayscale(1); }
+    }
+
+    .card-visual {
+      position: relative;
+      aspect-ratio: 332 / 460;
+      background: linear-gradient(145deg, #f2debf, #c8955e);
+    }
+
+    .card-visual img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .tag-row {
+      position: absolute;
+      inset: 10px 10px auto 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .tag {
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: rgba(42, 29, 17, 0.82);
+      color: #fff;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+    }
+
+    .stats-bar {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .damage-float {
+      position: absolute;
+      right: 12px;
+      bottom: 54px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(139, 45, 36, 0.92);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: none;
+    }
+
+    .damage-float.show {
+      opacity: 1;
+      transform: translateY(-6px);
+    }
+
+    .stat-orb {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+    }
+
+    .attack {
+      background: linear-gradient(180deg, #d86f31, #a3411e);
+    }
+
+    .health {
+      background: linear-gradient(180deg, #a43b38, #712121);
+    }
+
+    .card-body {
+      display: grid;
+      gap: 6px;
+      padding: 12px 12px 10px;
+    }
+
+    .card-name {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.3;
+      word-break: break-word;
+    }
+
+    .card-meta {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      word-break: break-all;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      padding: 0 12px 12px;
+    }
+
+    .card-actions button {
+      flex: 1;
+      min-height: 36px;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    .mini-btn {
+      background: rgba(157, 86, 35, 0.12);
+      color: var(--accent-dark);
+      border: 1px solid rgba(157, 86, 35, 0.12);
+    }
+
+    .mini-btn.success {
+      background: rgba(47, 106, 79, 0.12);
+      color: var(--success);
+      border-color: rgba(47, 106, 79, 0.12);
+    }
+
+    .mini-btn.danger {
+      background: rgba(139, 45, 36, 0.12);
+      color: var(--danger);
+      border-color: rgba(139, 45, 36, 0.12);
+    }
+
+    .timer-panel,
+    .sell-panel {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .timer-body,
+    .sell-body {
+      padding: 18px;
+    }
+
+    .timer-actions {
+      margin-top: 12px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .timer-ring {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at center, rgba(255, 255, 255, 0.88) 0 42%, transparent 43%),
+        conic-gradient(var(--accent) calc(var(--progress, 1) * 1turn), rgba(157, 86, 35, 0.12) 0);
+      border: 1px solid rgba(123, 86, 49, 0.16);
+      box-shadow: inset 0 8px 20px rgba(255,255,255,0.35);
+    }
+
+    .timer-inner {
+      width: 62%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 252, 247, 0.95);
+      text-align: center;
+    }
+
+    .timer-inner strong {
+      display: block;
+      font-size: clamp(24px, 4vw, 38px);
+      line-height: 1;
+    }
+
+    .timer-inner span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .sell-zone {
+      min-height: 240px;
+      border: 2px dashed rgba(139, 45, 36, 0.24);
+      border-radius: 20px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(180deg, rgba(255,255,255,0.36), rgba(139, 45, 36, 0.06));
+      text-align: center;
+      color: var(--muted);
+      padding: 14px;
+    }
+
+    .sell-zone.drop-ready {
+      border-color: rgba(139, 45, 36, 0.5);
+      background: linear-gradient(180deg, rgba(255,245,244,0.94), rgba(139, 45, 36, 0.12));
+    }
+
+    .battle-layout {
+      display: none;
+      gap: 16px;
+    }
+
+    .phase-battle .recruit-layout,
+    .phase-battle .board {
+      display: none;
+    }
+
+    .phase-battle .battle-layout {
+      display: grid;
+    }
+
+    .battle-zone.enemy .zone-header {
+      background: linear-gradient(180deg, rgba(109, 40, 48, 0.16), rgba(255,255,255,0));
+    }
+
+    .battle-zone.ally .zone-header {
+      background: linear-gradient(180deg, rgba(49, 95, 127, 0.16), rgba(255,255,255,0));
+    }
+
+    .battle-log {
+      min-height: 120px;
+      max-height: 180px;
+      overflow: auto;
+      padding: 16px 18px;
+      display: grid;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .battle-log p {
+      margin: 0;
+    }
+
+    .money-float {
+      position: fixed;
+      left: 18px;
+      bottom: 18px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255, 252, 244, 0.92);
+      border: 1px solid rgba(123, 86, 49, 0.2);
+      color: var(--text);
+      font-size: 14px;
+      box-shadow: 0 12px 26px rgba(61, 40, 18, 0.18);
+      z-index: 20;
+    }
+
+    .money-float strong {
+      color: var(--gold);
+      font-size: 16px;
+    }
+
+    @media (max-width: 1320px) {
+      .shop-slots,
+      .board-slots,
+      .hand-slots,
+      .battle-slots {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 1100px) {
+      .recruit-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .side-panel {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 1024px) {
+      .shop-slots,
+      .board-slots,
+      .hand-slots,
+      .battle-slots {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 780px) {
+      .app {
+        width: calc(100vw - 12px);
+        margin: 6px auto;
+        padding: 12px;
+        border-radius: 20px;
+      }
+
+      .zone,
+      .slot,
+      .card,
+      .timer-panel,
+      .sell-panel {
+        border-radius: 18px;
+      }
+
+      .shop-slots,
+      .board-slots,
+      .hand-slots,
+      .battle-slots,
+      .side-panel {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .slot {
+        min-height: 210px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" id="app">
+    <header class="topbar">
+      <section class="hero">
+        <span class="eyebrow">BATTLEGROUNDS PROTOTYPE</span>
+        <h1>酒馆卡牌交互原型</h1>
+        <p>
+          现在包含招募阶段与自动战斗阶段。商店买牌花费 3 金币，拖到右上角卖牌区可返还 1 金币。
+          倒计时结束后自动进入战斗，敌我双方按从左到右的顺序轮流攻击，并随机命中对方场上的一张牌。
+        </p>
+      </section>
+
+      <aside class="controls">
+        <div class="control-row">
+          <div class="pill money-pill">剩余金币<strong id="money-count">0</strong></div>
+          <div class="pill">卡池总数<strong id="pool-count">0</strong></div>
+          <div class="pill">刷新次数<strong id="refresh-count">0</strong></div>
+        </div>
+        <div class="control-row">
+          <button class="primary-btn" id="refresh-btn" type="button">刷新商店</button>
+          <button class="ghost-btn" id="start-battle-btn" type="button">立即战斗</button>
+          <button class="ghost-btn" id="reset-btn" type="button">重置全局</button>
+        </div>
+        <div class="status" id="status-text">准备就绪，先从商店挑牌组建阵容。</div>
+      </aside>
+    </header>
+
+    <section class="recruit-layout">
+      <div class="shop-column">
+        <section class="zone">
+          <div class="zone-header">
+            <div class="zone-title">
+              <h2>商店</h2>
+              <p>每次刷新随机展示 6 张卡。购买花费 3 金币，可拖到手牌区或点击按钮购买。</p>
+            </div>
+            <div class="zone-meta">
+              <span class="zone-badge">固定 6 格</span>
+            </div>
+          </div>
+          <div class="slots shop-slots" id="shop-zone"></div>
+        </section>
+      </div>
+
+      <aside class="side-panel">
+        <section class="timer-panel">
+          <div class="zone-header">
+            <div class="zone-title">
+              <h2>回合时钟</h2>
+              <p>倒计时归零后自动进入战斗</p>
+            </div>
+          </div>
+          <div class="timer-body">
+            <div class="timer-ring" id="timer-ring">
+              <div class="timer-inner">
+                <div>
+                  <strong id="timer-text">120</strong>
+                  <span>秒</span>
+                </div>
+              </div>
+            </div>
+            <div class="timer-actions">
+              <button class="ghost-btn" id="timer-start-btn" type="button">开始战斗</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="sell-panel">
+          <div class="zone-header">
+            <div class="zone-title">
+              <h2>卖牌区</h2>
+              <p>从手牌或上阵区拖到这里</p>
+            </div>
+          </div>
+          <div class="sell-body">
+            <div class="sell-zone" id="sell-zone">
+              卖掉卡牌返还 1 金币
+            </div>
+          </div>
+        </section>
+      </aside>
+    </section>
+
+    <section class="board">
+      <section class="zone">
+        <div class="zone-header">
+          <div class="zone-title">
+            <h2>上阵区域</h2>
+            <p>最多上阵 7 张。只能从手牌拖入，支持拖回手牌或卖出。</p>
+          </div>
+          <div class="zone-meta">
+            <span class="zone-badge">已上阵 <strong id="board-count">0</strong> / 7</span>
+          </div>
+        </div>
+        <div class="slots board-slots" id="board-zone"></div>
+      </section>
+
+      <section class="zone">
+        <div class="zone-header">
+          <div class="zone-title">
+            <h2>手牌区域</h2>
+            <p>最多容纳 10 张。可以从商店购买，再拖到上阵区域。</p>
+          </div>
+          <div class="zone-meta">
+            <span class="zone-badge">当前手牌 <strong id="hand-count">0</strong> / 10</span>
+          </div>
+        </div>
+        <div class="slots hand-slots" id="hand-zone"></div>
+      </section>
+    </section>
+
+    <section class="battle-layout">
+      <section class="zone battle-zone enemy">
+        <div class="zone-header">
+          <div class="zone-title">
+            <h2>敌方战场</h2>
+            <p>敌方阵容会在进入战斗时自动生成。</p>
+          </div>
+          <div class="zone-meta">
+            <span class="zone-badge">敌方存活 <strong id="enemy-count">0</strong></span>
+          </div>
+        </div>
+        <div class="slots battle-slots" id="enemy-zone"></div>
+      </section>
+
+      <section class="zone battle-zone ally">
+        <div class="zone-header">
+          <div class="zone-title">
+            <h2>我方战场</h2>
+            <p>按照从左到右顺序依次出手，攻击随机敌方目标。</p>
+          </div>
+          <div class="zone-meta">
+            <span class="zone-badge">我方存活 <strong id="ally-count">0</strong></span>
+          </div>
+        </div>
+        <div class="slots battle-slots" id="ally-zone"></div>
+      </section>
+
+      <section class="zone">
+        <div class="zone-header">
+          <div class="zone-title">
+            <h2>战斗日志</h2>
+            <p>自动记录每次出手与击败结果。</p>
+          </div>
+        </div>
+        <div class="battle-log" id="battle-log">
+          <p>战斗尚未开始。</p>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div class="money-float">金币 <strong id="money-float">0</strong></div>
+
+  <script>
+    const CARD_LIMITS = { shop: 6, board: 7, hand: 10 };
+    const BUY_PRICE = 3;
+    const SELL_PRICE = 1;
+    const START_MONEY = 100;
+    const TURN_DURATION = 120;
+    const BATTLE_STEP_MS = 950;
+
+    let cardPool = [];
+
+    function seededStat(seed, salt) {
+      let hash = 0;
+      const raw = `${seed}|${salt}`;
+      for (let i = 0; i < raw.length; i++) hash = (hash * 31 + raw.charCodeAt(i)) >>> 0;
+      return hash % 9 + 1;
+    }
+
+    function initializeCardPool(cardPaths) {
+      cardPool = cardPaths.map((path) => {
+        const fileName = path.split('/').pop();
+        const stem = fileName.replace(/\.[^.]+$/, '');
+        const match = stem.match(/^(.*?)(?:_(\d+))?$/);
+        const baseName = match ? match[1] : stem;
+        const variant = match && match[2] ? match[2] : '';
+        return { path, fileName, stem, baseName, variant, displayName: baseName.replace(/_/g, ' '), attack: seededStat(stem, 'atk'), health: seededStat(stem, 'hp') };
+      });
+    }
+
+    const state = {
+      phase: 'recruit', shopCards: [], handCards: [], boardCards: [], enemyBoardCards: [], refreshCount: 0, nextId: 1,
+      dragPayload: null, money: START_MONEY, timerRemaining: TURN_DURATION, timerId: null, battleTimerId: null,
+      battleLog: ['战斗尚未开始。'], battleTurn: 0, battleFirstSide: 'ally'
+    };
+
+    const elements = {
+      app: document.getElementById('app'), shopZone: document.getElementById('shop-zone'), handZone: document.getElementById('hand-zone'), boardZone: document.getElementById('board-zone'), enemyZone: document.getElementById('enemy-zone'), allyZone: document.getElementById('ally-zone'), handCount: document.getElementById('hand-count'), boardCount: document.getElementById('board-count'), enemyCount: document.getElementById('enemy-count'), allyCount: document.getElementById('ally-count'), moneyCount: document.getElementById('money-count'), moneyFloat: document.getElementById('money-float'), poolCount: document.getElementById('pool-count'), refreshCount: document.getElementById('refresh-count'), statusText: document.getElementById('status-text'), refreshBtn: document.getElementById('refresh-btn'), resetBtn: document.getElementById('reset-btn'), startBattleBtn: document.getElementById('start-battle-btn'), timerStartBtn: document.getElementById('timer-start-btn'), timerText: document.getElementById('timer-text'), timerRing: document.getElementById('timer-ring'), sellZone: document.getElementById('sell-zone'), battleLog: document.getElementById('battle-log')
+    };
+
+    // 从API加载卡牌列表
+    async function loadCardData() {
+      try {
+        const response = await fetch('/api/cards');
+        const data = await response.json();
+        initializeCardPool(data.cards);
+        initializeGame();
+      } catch (error) {
+        console.error('Failed to load cards:', error);
+        setStatus('加载卡牌失败，请刷新页面重试。');
+      }
+    }
+
+    function sampleCards(count, sourcePool = cardPool) {
+      const pool = [...sourcePool];
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      return pool.slice(0, count);
+    }
+
+    function instantiateCard(card) {
+      return { ...card, instanceId: state.nextId++, currentHealth: card.health, isAttacking: false, isDamaged: false, isDead: false };
+    }
+
+    function clearRecruitTimer() {
+      if (state.timerId) { clearInterval(state.timerId); state.timerId = null; }
+    }
+
+    function clearBattleTimer() {
+      if (state.battleTimerId) { clearTimeout(state.battleTimerId); state.battleTimerId = null; }
+    }
+
+    function setStatus(message) { elements.statusText.textContent = message; }
+
+    function updateTimerUi() {
+      elements.timerText.textContent = String(state.timerRemaining);
+      elements.timerRing.style.setProperty('--progress', String(state.timerRemaining / TURN_DURATION));
+    }
+
+    function startRecruitTimer() {
+      clearRecruitTimer();
+      state.timerRemaining = TURN_DURATION;
+      updateTimerUi();
+      state.timerId = setInterval(() => {
+        if (state.phase !== 'recruit') return clearRecruitTimer();
+        state.timerRemaining = Math.max(0, state.timerRemaining - 1);
+        updateTimerUi();
+        if (state.timerRemaining === 0) { clearRecruitTimer(); startBattle(); }
+      }, 1000);
+    }
+
+    function refreshShop(showStatus = true) {
+      state.shopCards = sampleCards(CARD_LIMITS.shop);
+      state.refreshCount += 1;
+      renderRecruit();
+      if (showStatus) setStatus(`商店已刷新，第 ${state.refreshCount} 次，共出现 6 张随机卡牌。`);
+    }
+
+    function cloneForBattle(card) {
+      return { ...card, currentHealth: card.currentHealth ?? card.health, isAttacking: false, isDamaged: false, isDead: false };
+    }
+
+    function generateEnemyBoard() {
+      const size = Math.max(1, Math.min(CARD_LIMITS.board, state.boardCards.length || 3));
+      return sampleCards(size).map((card) => instantiateCard(card)).map((card) => cloneForBattle(card));
+    }
+
+    function resetForRecruit() {
+      state.phase = 'recruit';
+      clearBattleTimer();
+      clearRecruitTimer();
+      state.enemyBoardCards = [];
+      state.battleTurn = 0;
+      state.battleLog = ['战斗尚未开始。'];
+      state.boardCards = state.boardCards.map((card) => ({ ...card, currentHealth: card.health, isAttacking: false, isDamaged: false, isDead: false }));
+      startRecruitTimer();
+      render();
+    }
+
+    function resetGame() {
+      clearRecruitTimer();
+      clearBattleTimer();
+      state.handCards = [];
+      state.boardCards = [];
+      state.enemyBoardCards = [];
+      state.refreshCount = 0;
+      state.nextId = 1;
+      state.money = START_MONEY;
+      state.phase = 'recruit';
+      state.battleLog = ['战斗尚未开始。'];
+      refreshShop(false);
+      startRecruitTimer();
+      render();
+      setStatus('已重置。先从商店买牌到手牌区，再拖到上阵区。');
+    }
+
+    function createEmptySlot(label) {
+      const slot = document.createElement('div');
+      slot.className = 'slot';
+      const text = document.createElement('div');
+      text.className = 'slot-label';
+      text.textContent = label;
+      slot.appendChild(text);
+      return slot;
+    }
+
+    function beginDrag(payload, event) {
+      if (state.phase !== 'recruit') { event.preventDefault(); return; }
+      state.dragPayload = payload;
+      event.dataTransfer.effectAllowed = payload.source === 'shop' ? 'copy' : 'move';
+      event.dataTransfer.setData('text/plain', JSON.stringify(payload));
+      event.currentTarget.classList.add('dragging');
+    }
+
+    function endDrag(event) {
+      event.currentTarget.classList.remove('dragging');
+      document.querySelectorAll('.slot, .sell-zone').forEach((slot) => slot.classList.remove('drop-ready'));
+    }
+
+    function canDropInto(targetZone) {
+      const payload = state.dragPayload;
+      if (!payload || state.phase !== 'recruit') return false;
+      if (targetZone === 'hand') return (payload.source === 'shop' || payload.source === 'board') && state.handCards.length < CARD_LIMITS.hand;
+      if (targetZone === 'board') return payload.source === 'hand' && state.boardCards.length < CARD_LIMITS.board;
+      if (targetZone === 'sell') return payload.source === 'hand' || payload.source === 'board';
+      return false;
+    }
+
+    function attachDropTarget(target, zone) {
+      target.addEventListener('dragover', (event) => { if (canDropInto(zone)) event.preventDefault(); });
+      target.addEventListener('dragenter', (event) => { if (canDropInto(zone)) { event.preventDefault(); target.classList.add('drop-ready'); } });
+      target.addEventListener('dragleave', () => target.classList.remove('drop-ready'));
+      target.addEventListener('drop', (event) => { event.preventDefault(); target.classList.remove('drop-ready'); handleDrop(zone); });
+    }
+
+    function handleDrop(targetZone) {
+      const payload = state.dragPayload;
+      if (!payload) return;
+      if (targetZone === 'hand') {
+        if (payload.source === 'shop') addShopCardToHand(payload.index);
+        else if (payload.source === 'board') moveBoardCardToHand(payload.instanceId);
+      }
+      if (targetZone === 'board' && payload.source === 'hand') moveHandCardToBoard(payload.instanceId);
+      if (targetZone === 'sell') sellCard(payload);
+      state.dragPayload = null;
+    }
+
+    function addShopCardToHand(shopIndex) {
+      if (state.phase !== 'recruit') return;
+      if (state.handCards.length >= CARD_LIMITS.hand) return setStatus('手牌已满，最多只能容纳 10 张。');
+      if (state.money < BUY_PRICE) return setStatus('金币不足，购买一张卡需要 3 金币。');
+      const card = state.shopCards[shopIndex];
+      if (!card) return;
+      state.money -= BUY_PRICE;
+      state.shopCards[shopIndex] = null;
+      state.handCards.push(instantiateCard(card));
+      renderRecruit();
+      setStatus(`已花费 ${BUY_PRICE} 金币购买 ${card.displayName}。`);
+    }
+
+    function moveHandCardToBoard(instanceId) {
+      if (state.phase !== 'recruit') return;
+      if (state.boardCards.length >= CARD_LIMITS.board) return setStatus('上阵区域已满，最多只能上阵 7 张。');
+      const index = state.handCards.findIndex((card) => card.instanceId === instanceId);
+      if (index === -1) return;
+      const [card] = state.handCards.splice(index, 1);
+      state.boardCards.push(card);
+      if (card.baseName === 'mizhu') {
+        state.boardCards.forEach((unit) => {
+          unit.attack += 1;
+          unit.health += 1;
+          unit.currentHealth += 1;
+        });
+        setStatus('糜竺上阵，场上所有卡牌获得 +1/+1。');
+      } else {
+        setStatus(`${card.displayName} 已上阵。`);
+      }
+      renderRecruit();
+    }
+
+    function moveBoardCardToHand(instanceId) {
+      if (state.phase !== 'recruit') return;
+      if (state.handCards.length >= CARD_LIMITS.hand) return setStatus('手牌已满，无法把上阵卡拖回手牌。');
+      const index = state.boardCards.findIndex((card) => card.instanceId === instanceId);
+      if (index === -1) return;
+      const [card] = state.boardCards.splice(index, 1);
+      state.handCards.push(card);
+      renderRecruit();
+      setStatus(`${card.displayName} 已返回手牌。`);
+    }
+
+    function sellCard(payload) {
+      if (state.phase !== 'recruit') return;
+      let soldCard = null;
+      if (payload.source === 'hand') {
+        const index = state.handCards.findIndex((card) => card.instanceId === payload.instanceId);
+        if (index !== -1) [soldCard] = state.handCards.splice(index, 1);
+      }
+      if (payload.source === 'board') {
+        const index = state.boardCards.findIndex((card) => card.instanceId === payload.instanceId);
+        if (index !== -1) [soldCard] = state.boardCards.splice(index, 1);
+      }
+      if (!soldCard) return;
+      state.money += SELL_PRICE;
+      renderRecruit();
+      setStatus(`${soldCard.displayName} 已卖出，返还 ${SELL_PRICE} 金币。`);
+    }
+
+    function createCardElement(card, source, index) {
+      const article = document.createElement('article');
+      article.className = 'card';
+      const dataSide = source === 'enemy-battle' ? 'enemy' : source === 'ally-battle' ? 'ally' : source;
+      article.dataset.side = dataSide;
+      article.dataset.id = String(card.instanceId ?? '');
+      article.draggable = state.phase === 'recruit' && !['shop-battle', 'enemy-battle', 'ally-battle'].includes(source);
+      if (article.draggable) {
+        article.addEventListener('dragstart', (event) => beginDrag(source === 'shop' ? { source, index } : { source, instanceId: card.instanceId }, event));
+        article.addEventListener('dragend', endDrag);
+      }
+      if (card.isAttacking) article.classList.add('attacking');
+      if (card.isDamaged) article.classList.add('damaged');
+      if (card.isDead) article.classList.add('dead');
+      const variantText = card.variant ? `变体 ${card.variant}` : '基础版';
+      let actionButton = '';
+      if (state.phase === 'recruit') {
+        if (source === 'shop') actionButton = '<button class="mini-btn success" type="button">购买 -3</button>';
+        else if (source === 'hand') actionButton = '<button class="mini-btn" type="button">上阵</button>';
+        else if (source === 'board') actionButton = '<button class="mini-btn danger" type="button">回手/卖出</button>';
+      }
+      article.innerHTML = `
+        <div class="card-visual">
+          <img src="${card.path}" alt="${card.displayName}">
+          <div class="tag-row">
+            <span class="tag">${source === 'shop' ? '商店' : source === 'hand' ? '手牌' : source === 'board' ? '上阵' : source === 'enemy-battle' ? '敌方' : '我方'}</span>
+            <span class="tag">${variantText}</span>
+          </div>
+          <span class="damage-float" data-role="damage"></span>
+          <div class="stats-bar">
+            <span class="stat-orb attack">${card.attack}</span>
+            <span class="stat-orb health" data-role="health">${Math.max(0, card.currentHealth ?? card.health)}</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <h3 class="card-name">${card.displayName}</h3>
+          <p class="card-meta">${card.fileName}</p>
+        </div>
+        ${actionButton ? `<div class="card-actions">${actionButton}</div>` : ''}
+      `;
+      if (actionButton) {
+        const button = article.querySelector('button');
+        button.addEventListener('click', () => {
+          if (source === 'shop') addShopCardToHand(index);
+          else if (source === 'hand') moveHandCardToBoard(card.instanceId);
+          else if (source === 'board') moveBoardCardToHand(card.instanceId);
+        });
+      }
+      return article;
+    }
+
+    function renderZone(zoneElement, cards, zoneType, limit) {
+      zoneElement.innerHTML = '';
+      for (let i = 0; i < limit; i++) {
+        const slot = createEmptySlot(zoneType === 'shop' ? '刷新后出现新的商店卡牌' : zoneType === 'hand' ? '将商店卡拖到这里' : '将手牌卡拖到这里');
+        if (zoneType === 'hand' || zoneType === 'board') attachDropTarget(slot, zoneType);
+        if (cards[i]) { slot.innerHTML = ''; slot.appendChild(createCardElement(cards[i], zoneType, i)); }
+        zoneElement.appendChild(slot);
+      }
+    }
+
+    function renderBattleZone(zoneElement, cards, side) {
+      zoneElement.innerHTML = '';
+      for (let i = 0; i < CARD_LIMITS.board; i++) {
+        const slot = createEmptySlot(side === 'enemy' ? '敌方空位' : '我方空位');
+        if (cards[i]) { slot.innerHTML = ''; slot.appendChild(createCardElement(cards[i], side === 'enemy' ? 'enemy-battle' : 'ally-battle', i)); }
+        zoneElement.appendChild(slot);
+      }
+    }
+
+    function renderBattleLog() {
+      elements.battleLog.innerHTML = '';
+      state.battleLog.forEach((line) => {
+        const p = document.createElement('p');
+        p.textContent = line;
+        elements.battleLog.appendChild(p);
+      });
+      elements.battleLog.scrollTop = elements.battleLog.scrollHeight;
+    }
+
+    function renderRecruit() {
+      elements.moneyCount.textContent = String(state.money);
+      elements.moneyFloat.textContent = String(state.money);
+      elements.poolCount.textContent = String(cardPool.length);
+      elements.refreshCount.textContent = String(state.refreshCount);
+      elements.handCount.textContent = String(state.handCards.length);
+      elements.boardCount.textContent = String(state.boardCards.length);
+      updateTimerUi();
+      renderZone(elements.shopZone, state.shopCards, 'shop', CARD_LIMITS.shop);
+      renderZone(elements.boardZone, state.boardCards, 'board', CARD_LIMITS.board);
+      renderZone(elements.handZone, state.handCards, 'hand', CARD_LIMITS.hand);
+    }
+
+    function renderBattle() {
+      elements.enemyCount.textContent = String(state.enemyBoardCards.length);
+      elements.allyCount.textContent = String(state.boardCards.length);
+      renderBattleZone(elements.enemyZone, state.enemyBoardCards, 'enemy');
+      renderBattleZone(elements.allyZone, state.boardCards, 'ally');
+      renderBattleLog();
+    }
+
+    function render() {
+      elements.app.classList.toggle('phase-battle', state.phase === 'battle');
+      elements.refreshBtn.disabled = state.phase !== 'recruit';
+      elements.startBattleBtn.disabled = state.phase !== 'recruit';
+      elements.timerStartBtn.disabled = state.phase !== 'recruit';
+      renderRecruit();
+      renderBattle();
+    }
+
+    function removeDeadCards() {
+      state.boardCards = state.boardCards.filter((card) => !card.isDead && card.currentHealth > 0);
+      state.enemyBoardCards = state.enemyBoardCards.filter((card) => !card.isDead && card.currentHealth > 0);
+    }
+
+    function markCleanup() {
+      state.boardCards.forEach((card) => { card.isAttacking = false; card.isDamaged = false; });
+      state.enemyBoardCards.forEach((card) => { card.isAttacking = false; card.isDamaged = false; });
+    }
+
+    function appendBattleLog(message) {
+      state.battleLog.push(message);
+      if (state.battleLog.length > 12) state.battleLog.shift();
+    }
+
+    function getNextAttacker(side, startIndex) {
+      const cards = side === 'ally' ? state.boardCards : state.enemyBoardCards;
+      if (cards.length === 0) return null;
+      for (let offset = 0; offset < cards.length; offset++) {
+        const idx = (startIndex + offset) % cards.length;
+        if (cards[idx] && cards[idx].currentHealth > 0) return { card: cards[idx], index: idx };
+      }
+      return null;
+    }
+
+    function chooseRandomTarget(side) {
+      const cards = side === 'ally' ? state.boardCards : state.enemyBoardCards;
+      if (cards.length === 0) return null;
+      return cards[Math.floor(Math.random() * cards.length)];
+    }
+
+    function getCardElement(side, instanceId) {
+      if (!instanceId) return null;
+      return document.querySelector(`.card[data-side="${side}"][data-id="${instanceId}"]`);
+    }
+
+    function updateHealthUi(cardEl, value) {
+      if (!cardEl) return;
+      const healthEl = cardEl.querySelector('[data-role="health"]');
+      if (healthEl) healthEl.textContent = String(value);
+    }
+
+    function showDamage(cardEl, amount) {
+      if (!cardEl) return;
+      const damageEl = cardEl.querySelector('[data-role="damage"]');
+      if (damageEl) {
+        damageEl.textContent = String(amount);
+        damageEl.classList.remove('show');
+        void damageEl.offsetWidth;
+        damageEl.classList.add('show');
+      }
+    }
+
+    async function executeBattleStep() {
+      if (state.phase !== 'battle') return;
+      const attacker = getNextAttacker(state.battleFirstSide, 0);
+      if (!attacker) {
+        const allyAlive = state.boardCards.length > 0;
+        const enemyAlive = state.enemyBoardCards.length > 0;
+        if (allyAlive && !enemyAlive) {
+          appendBattleLog('🎉 我方胜利！');
+          resetForRecruit();
+        } else if (!allyAlive && enemyAlive) {
+          appendBattleLog('💀 敌方胜利！');
+          resetForRecruit();
+        } else if (!allyAlive && !enemyAlive) {
+          appendBattleLog('⚔️ 平局！');
+          resetForRecruit();
+        }
+        renderBattle();
+        return;
+      }
+      const target = chooseRandomTarget(state.battleFirstSide === 'ally' ? 'enemy' : 'ally');
+      if (!target) {
+        removeDeadCards();
+        state.battleFirstSide = state.battleFirstSide === 'ally' ? 'enemy' : 'ally';
+        state.battleTurn += 1;
+        await new Promise((resolve) => setTimeout(resolve, BATTLE_STEP_MS));
+        executeBattleStep();
+        return;
+      }
+      attacker.card.isAttacking = true;
+      target.isDamaged = true;
+      renderBattle();
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const damage = attacker.card.attack;
+      target.currentHealth -= damage;
+      showDamage(getCardElement(state.battleFirstSide === 'ally' ? 'enemy' : 'ally', target.instanceId), damage);
+      const targetEl = getCardElement(state.battleFirstSide === 'ally' ? 'enemy' : 'ally', target.instanceId);
+      targetEl?.classList.add('hit');
+      if (target.currentHealth <= 0) {
+        target.isDead = true;
+        target.isDamaged = false;
+        if (targetEl) targetEl.classList.add('dying');
+        appendBattleLog(`${target.displayName} 被击败！`);
+      } else {
+        appendBattleLog(`${target.displayName} 受到 ${damage} 伤害，剩余血量 ${target.currentHealth}。`);
+      }
+      updateHealthUi(targetEl, Math.max(0, target.currentHealth));
+      renderBattle();
+      await new Promise((resolve) => setTimeout(resolve, 550));
+      removeDeadCards();
+      renderBattle();
+      if (state.phase !== 'battle') return;
+      if (state.boardCards.length === 0 || state.enemyBoardCards.length === 0) {
+        resetForRecruit();
+        return;
+      }
+      state.battleFirstSide = state.battleFirstSide === 'ally' ? 'enemy' : 'ally';
+      state.battleTurn += 1;
+      await new Promise((resolve) => setTimeout(resolve, BATTLE_STEP_MS));
+      executeBattleStep();
+    }
+
+    function startBattle() {
+      state.phase = 'battle';
+      state.battleLog = [];
+      state.enemyBoardCards = generateEnemyBoard();
+      appendBattleLog('⚔️ 战斗开始！');
+      render();
+      executeBattleStep();
+    }
+
+    elements.refreshBtn.addEventListener('click', refreshShop);
+    elements.startBattleBtn.addEventListener('click', startBattle);
+    elements.resetBtn.addEventListener('click', resetGame);
+    elements.timerStartBtn.addEventListener('click', startBattle);
+
+    function initializeGame() {
+      refreshShop(false);
+      startRecruitTimer();
+      render();
+      setStatus('已加载。先从商店挑牌组建阵容。');
+    }
+
+    // 页面加载时初始化
+    loadCardData();
+  </script>
+</body>
+</html>
