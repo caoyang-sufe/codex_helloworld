@@ -27,6 +27,8 @@ urlpatterns = [
     path("game", views.game, name="game"),
     path("handbook", views.handbook, name="handbook"),
     path("api/cards", views.api_cards, name="api-cards"),
+    path("api/game/new", views.api_game_new, name="api-game-new"),
+    path("api/game/action", views.api_game_action, name="api-game-action"),
 ]
 
 if settings.DEBUG:
