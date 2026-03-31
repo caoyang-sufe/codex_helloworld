@@ -1,0 +1,7 @@
+ID	ShopRank	UpgradeCost	ShopColumn	RollingChance1	RollingChance2	RollingChance3	RollingChance4	RollingChance5	RollingChance6	RollingChanceGod	ShowPercentage
+1	1	0	3	100	0	0	0	0	0	0	100
+2	2	6	4	50	50	0	0	0	0	0	100
+3	3	12	4	25	35	40	0	0	0	0	100
+4	4	18	5	10	20	35	35	0	0	0	100
+5	5	20	5	7	15	28	30	20	0	0	100
+6	6	22	6	0	100	250	300	200	150	4	1000

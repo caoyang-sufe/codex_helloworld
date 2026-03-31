@@ -1,0 +1,5 @@
+PropID	PropName	FlowerItemID	FlowerCost	ClientDisplay	IsVegetableLeaf
+710040	鲜花	710040	1	1	
+710195	加个鸡腿	710040	10	3	
+710188	菜叶	710040	1	2	1
+710196	一桶凉水	710040	10	4	1
