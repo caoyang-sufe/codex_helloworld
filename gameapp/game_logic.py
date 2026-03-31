@@ -4,7 +4,7 @@ import random
 import uuid
 from dataclasses import asdict, dataclass, field
 
-from .config_loader import CardDef, GameConfig, WeaponDef, load_game_config
+from .config_loader import CardDef, GameConfig, load_game_config
 
 MAX_ROUNDS = 25
 PLAYER_COUNT = 8
@@ -12,9 +12,6 @@ BOARD_LIMIT = 7
 HAND_LIMIT = 10
 SHOP_SLOTS = 6
 START_HEALTH = 40
-EQUIPMENT_ROUNDS = {3, 7, 11}
-
-GLOBAL_NEXT_BATTLE_SPELLS = {"wanjianqifa", "qinzeiqinwang"}
 
 
 @dataclass
@@ -29,9 +26,6 @@ class CardInstance:
     skill: str
     faction: str
     origin: str = "card"
-    temp_attack: int = 0
-    temp_health: int = 0
-    blades: int = 0
 
 
 @dataclass
@@ -49,8 +43,6 @@ class PlayerState:
     upgrade_discount: int = 0
     equipment: dict | None = None
     pending_discover: list[CardInstance] = field(default_factory=list)
-    pending_equip_choices: list[dict] = field(default_factory=list)
-    queued_global_spells: list[str] = field(default_factory=list)
 
     @property
     def alive(self) -> bool:
@@ -75,9 +67,6 @@ class GameEngine:
         self.games: dict[str, MatchState] = {}
         self.recruit_pool = [c for c in self.config.recruit_cards if c.card_type == 2]
         self.gold_mapping = {c.id: c for c in self.config.recruit_cards + self.config.derived_cards if c.card_type == 1}
-        self.spells_by_id: dict[str, list] = {}
-        for spell in self.config.spells:
-            self.spells_by_id.setdefault(spell.id, []).append(spell)
 
     def new_game(self, hero_name: str = "default") -> MatchState:
         gid = uuid.uuid4().hex
@@ -101,15 +90,13 @@ class GameEngine:
             return
 
         human = game.players[0]
-        self._clear_battle_temporary_effects(human)
         human.gold += min(game.round_no + 2, 15)
 
-        if game.round_no in EQUIPMENT_ROUNDS:
-            choices = random.sample(self.config.weapons, k=min(3, len(self.config.weapons)))
-            human.pending_equip_choices = [asdict(c) for c in choices]
+        if game.round_no in {3, 7, 11}:
+            human.equipment = asdict(random.choice(self.config.weapons))
 
         if not human.lock_shop:
-            self.refresh_shop(human, force=True)
+            self.refresh_shop(human)
         human.lock_shop = False
 
         self._setup_ai_boards(game)
@@ -130,6 +117,8 @@ class GameEngine:
         if player.gold < 3 or len(player.hand) >= HAND_LIMIT:
             return False
         card = player.shop[shop_index]
+        if not card:
+            return False
         player.gold -= 3
         player.hand.append(card)
         player.shop[shop_index] = self._draw_recruit_card(player.tavern_tier)
@@ -142,10 +131,6 @@ class GameEngine:
             return False
         if len(player.board) >= BOARD_LIMIT:
             return False
-        card = player.hand[hand_index]
-        if card.origin == "spell":
-            return False
-
         card = player.hand.pop(hand_index)
         if board_index is None or board_index >= len(player.board):
             player.board.append(card)
@@ -166,14 +151,6 @@ class GameEngine:
 
     def toggle_shop_lock(self, game: MatchState, locked: bool) -> None:
         game.players[0].lock_shop = locked
-
-    def choose_equipment(self, game: MatchState, option_index: int) -> bool:
-        player = game.players[0]
-        if not (0 <= option_index < len(player.pending_equip_choices)):
-            return False
-        player.equipment = player.pending_equip_choices[option_index]
-        player.pending_equip_choices = []
-        return True
 
     def upgrade_tavern(self, game: MatchState) -> bool:
         player = game.players[0]
@@ -200,44 +177,6 @@ class GameEngine:
         player.pending_discover = []
         return True
 
-    def cast_spell(self, game: MatchState, hand_index: int, target_index: int | None = None) -> bool:
-        player = game.players[0]
-        if game.phase != "recruit" or not (0 <= hand_index < len(player.hand)):
-            return False
-        spell = player.hand[hand_index]
-        if spell.origin != "spell":
-            return False
-
-        if spell.id in GLOBAL_NEXT_BATTLE_SPELLS:
-            player.queued_global_spells.append(spell.id)
-            player.hand.pop(hand_index)
-            return True
-
-        if target_index is None or not (0 <= target_index < len(player.board)):
-            return False
-
-        target = player.board[target_index]
-        if spell.id == "tao":
-            target.health += self._value_from_skill(spell.skill, default=4)
-        elif spell.id == "jiu":
-            target.attack += self._value_from_skill(spell.skill, default=4)
-        elif spell.id == "huoshangjiaoyou":
-            target.attack += 1
-            target.health += 1
-            target.blades += max(1, spell.skill.count("烈刃"))
-        elif spell.id == "wuxiekeji":
-            target.attack += 4
-            target.health += 4
-        elif spell.id == "kurouji":
-            target.attack += 4
-            target.health += 3
-        else:
-            return False
-
-        player.hand.pop(hand_index)
-        self._resolve_triples(player)
-        return True
-
     def end_recruit_and_battle(self, game: MatchState) -> None:
         if game.phase != "recruit" or game.game_over:
             return
@@ -251,14 +190,11 @@ class GameEngine:
             game.game_over = True
             game.winner_index = 0
             return
-
         opponent = random.choice(alive_ai)
         opponent.tavern_tier = human.tavern_tier
         game.pending_opponent = opponent.index
 
-        self._apply_queued_global_spells(human, opponent)
         result = self._simulate_battle(human, opponent)
-
         if result == "human_loss":
             dmg = sum(card.tier for card in opponent.board) + opponent.tavern_tier
             human.health = max(0, human.health - dmg)
@@ -282,7 +218,7 @@ class GameEngine:
             "game_over": game.game_over,
             "winner_index": game.winner_index,
             "pending_opponent": game.pending_opponent,
-            "logs": game.logs[-18:],
+            "logs": game.logs[-12:],
             "players": [self._serialize_player(p) for p in game.players],
         }
 
@@ -302,8 +238,6 @@ class GameEngine:
             "shop": [asdict(c) for c in player.shop],
             "equipment": player.equipment,
             "pending_discover": [asdict(c) for c in player.pending_discover],
-            "pending_equip_choices": player.pending_equip_choices,
-            "queued_global_spells": player.queued_global_spells,
         }
 
     def _draw_recruit_card(self, tavern_tier: int) -> CardInstance:
@@ -331,7 +265,10 @@ class GameEngine:
             return
 
         while True:
-            normal_cards = [c for c in (player.hand + player.board) if c.card_type == 2]
+            normal_cards = [
+                c for c in (player.hand + player.board)
+                if c.card_type == 2
+            ]
             grouped: dict[str, list[CardInstance]] = {}
             for card in normal_cards:
                 grouped.setdefault(card.id, []).append(card)
@@ -349,7 +286,9 @@ class GameEngine:
                 player.hand.append(self._create_instance(gold_def))
 
             discover_tier = min(6, player.tavern_tier + 1)
-            discover_pool = [c for c in self.recruit_pool if c.tier == discover_tier] or [c for c in self.recruit_pool if c.tier == player.tavern_tier]
+            discover_pool = [c for c in self.recruit_pool if c.tier == discover_tier]
+            if not discover_pool:
+                discover_pool = [c for c in self.recruit_pool if c.tier == player.tavern_tier]
             options = random.sample(discover_pool, k=min(3, len(discover_pool)))
             player.pending_discover = [self._create_instance(c) for c in options]
 
@@ -365,29 +304,17 @@ class GameEngine:
             ai.board = [self._create_instance(c) for c in sample]
 
     def _simulate_battle(self, human: PlayerState, ai: PlayerState) -> str:
-        human_power = sum(c.attack + c.temp_attack + c.health + c.temp_health + c.blades for c in human.board)
-        ai_power = sum(c.attack + c.temp_attack + c.health + c.temp_health + c.blades for c in ai.board)
+        human_power = sum(c.attack + c.health for c in human.board)
+        ai_power = sum(c.attack + c.health for c in ai.board)
         if human_power == ai_power:
-            return "draw"
+            return random.choice(["draw", "draw", "ai_loss", "human_loss"])
         return "ai_loss" if human_power > ai_power else "human_loss"
-
-    def _apply_queued_global_spells(self, human: PlayerState, ai: PlayerState) -> None:
-        for spell_id in human.queued_global_spells:
-            if spell_id == "wanjianqifa":
-                for card in ai.board:
-                    card.temp_health -= 10
-            elif spell_id == "qinzeiqinwang" and ai.board:
-                target = max(ai.board, key=lambda c: c.health + c.temp_health)
-                current_hp = max(1, target.health + target.temp_health)
-                target.temp_health -= current_hp // 2
-        ai.board = [c for c in ai.board if c.health + c.temp_health > 0]
-        human.queued_global_spells = []
 
     def _check_elimination(self, game: MatchState) -> None:
         living = [p for p in game.players if p.alive]
         if not game.players[0].alive:
             game.game_over = True
-            game.winner_index = max(living, key=lambda p: p.health).index if living else None
+            game.winner_index = living[0].index if living else None
             return
         if len(living) == 1:
             game.game_over = True
@@ -411,32 +338,22 @@ class GameEngine:
     def _give_upgrade_spell(self, player: PlayerState) -> None:
         tier = player.tavern_tier
         candidates = [s for s in self.config.spells if s.tier == tier]
-        if not candidates or len(player.hand) >= HAND_LIMIT:
+        if not candidates:
             return
-
         offer = random.sample(candidates, k=min(3, len(candidates)))
-        pick = random.choice(offer)
-        player.hand.append(
-            CardInstance(
-                uid=uuid.uuid4().hex[:10],
-                id=pick.id,
-                name=pick.name,
-                card_type=0,
-                tier=pick.tier,
-                attack=0,
-                health=0,
-                skill=pick.skill,
-                faction="spell",
-                origin="spell",
+        if offer and len(player.hand) < HAND_LIMIT:
+            pick = random.choice(offer)
+            player.hand.append(
+                CardInstance(
+                    uid=uuid.uuid4().hex[:10],
+                    id=pick.id,
+                    name=pick.name,
+                    card_type=0,
+                    tier=pick.tier,
+                    attack=0,
+                    health=0,
+                    skill=pick.skill,
+                    faction="spell",
+                    origin="spell",
+                )
             )
-        )
-
-    def _clear_battle_temporary_effects(self, player: PlayerState) -> None:
-        for card in player.board:
-            card.temp_attack = 0
-            card.temp_health = 0
-
-    @staticmethod
-    def _value_from_skill(skill: str, default: int = 0) -> int:
-        nums = [int(token) for token in skill.replace("+", " ").replace("点", " ").split() if token.isdigit()]
-        return nums[0] if nums else default
