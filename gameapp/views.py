@@ -65,12 +65,7 @@ def api_game_action(request):
     elif action == "buy":
         ENGINE.buy_from_shop(game, int(payload.get("shop_index", -1)))
     elif action == "play":
-        board_index = payload.get("board_index")
-        ENGINE.play_to_board(
-            game,
-            int(payload.get("hand_index", -1)),
-            int(board_index) if board_index is not None else None,
-        )
+        ENGINE.play_to_board(game, int(payload.get("hand_index", -1)), payload.get("board_index"))
     elif action == "sell":
         ENGINE.sell_from_hand(game, int(payload.get("hand_index", -1)))
     elif action == "lock":
@@ -79,15 +74,6 @@ def api_game_action(request):
         ENGINE.upgrade_tavern(game)
     elif action == "discover_pick":
         ENGINE.choose_discover(game, int(payload.get("option_index", -1)))
-    elif action == "choose_equipment":
-        ENGINE.choose_equipment(game, int(payload.get("option_index", -1)))
-    elif action == "cast_spell":
-        target_index = payload.get("target_index")
-        ENGINE.cast_spell(
-            game,
-            int(payload.get("hand_index", -1)),
-            int(target_index) if target_index is not None else None,
-        )
     elif action == "battle":
         ENGINE.end_recruit_and_battle(game)
 
